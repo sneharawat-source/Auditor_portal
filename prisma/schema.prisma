@@ -1,0 +1,169 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("auditor") // admin, auditor, compliance, manager, viewer
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  activities     Activity[]
+  assignedTasks  Task[]
+  teamMemberships TeamMember[]
+}
+
+model Framework {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  description String?
+  controls    Control[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Control {
+  id           String   @id @default(cuid())
+  controlId    String   // e.g., "CC1.1"
+  name         String
+  description  String
+  framework    Framework @relation(fields: [frameworkId], references: [id], onDelete: Cascade)
+  frameworkId  String
+  owner        String
+  status       String   @default("pending") // passing, failing, pending, in_review, needs_changes, remediated, closed
+  riskLevel    String   @default("medium") // critical, high, medium, low
+  dueDate      DateTime?
+  lastUpdated  DateTime @default(now())
+  completed    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  comments  Comment[]
+  evidence  Evidence[]
+  policies  Policy[]
+  activities Activity[]
+
+  @@unique([frameworkId, controlId])
+  @@index([frameworkId])
+  @@index([status])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  content   String
+  control   Control  @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  controlId String
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([controlId])
+}
+
+model Evidence {
+  id          String   @id @default(cuid())
+  fileName    String
+  fileUrl     String
+  fileType    String
+  control     Control  @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  controlId   String
+  uploadedBy  String
+  uploadedAt  DateTime @default(now())
+
+  @@index([controlId])
+}
+
+model Policy {
+  id        String   @id @default(cuid())
+  title     String
+  content   String
+  control   Control  @relation(fields: [controlId], references: [id], onDelete: Cascade)
+  controlId String
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([controlId])
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  priority    String   @default("medium") // critical, high, medium, low
+  status      String   @default("open") // open, in_progress, completed, blocked, overdue
+  controlId   String
+  assignedTo  User     @relation(fields: [assignedToId], references: [id])
+  assignedToId String
+  dueDate     DateTime
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([assignedToId])
+  @@index([status])
+}
+
+model TeamMember {
+  id              String   @id @default(cuid())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId          String
+  department      String
+  joinedDate      DateTime @default(now())
+  assignedControls String[] // Array of control IDs
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Activity {
+  id        String   @id @default(cuid())
+  action    String   // "Status Updated", "Evidence Uploaded", "Comment Added", etc.
+  details   String?
+  controlId String?
+  control   Control? @relation(fields: [controlId], references: [id], onDelete: SetNull)
+  changes   String?
+  user      User     @relation(fields: [userId], references: [id])
+  userId    String
+  timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([controlId])
+  @@index([timestamp])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String   // error, warning, success, info
+  link      String?
+  read      Boolean  @default(false)
+  userId    String
+  timestamp DateTime @default(now())
+
+  @@index([userId])
+  @@index([read])
+}
+
+model AuditSettings {
+  id              String   @id @default(cuid())
+  organization    String
+  framework       String
+  auditPeriodStart DateTime
+  auditPeriodEnd  DateTime
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
