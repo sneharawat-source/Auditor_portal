@@ -12,6 +12,7 @@ export default function DashboardPage() {
   useEffect(() => {
     setMounted(true);
   }, []);
+// hi
 
   if (!mounted) return null;
 
